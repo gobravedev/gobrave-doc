@@ -1,0 +1,33 @@
++++
+title = 'Documentation'
+date = '2026-08-02T00:00:00+08:00'
+draft = false
+type = 'page'
+layout = 'single'
++++
+
+## Documentation
+
+Welcome to the gobrave documentation. Here you'll find guides and references for using the platform.
+
+### Getting Started
+
+- [Quick Start](/docs/quick-start) — Set up and run gobrave locally
+- [Configuration](/docs/configuration) — All configuration options explained
+- [Architecture](/docs/architecture) — System architecture overview
+
+### Core Concepts
+
+- [DAG Workflows](/docs/dag) — Understanding DAG-based pipeline orchestration
+- [Container Management](/docs/containers) — Docker container lifecycle
+- [Data Management](/docs/data) — Managing samples, files, and datasets
+
+### Advanced Topics
+
+- [Dynamic Orchestration V2](/docs/orchestration-v2) — Runtime node materialization
+- [Dataflow Engine V3](/docs/dataflow-v3) — Reactive streaming pipelines
+- [LLM Integration](/docs/llm) — AI-assisted analysis setup
+
+### API Reference
+
+- [Swagger Docs](/docs/api) — Interactive API documentation

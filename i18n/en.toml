@@ -1,0 +1,9 @@
+# English translation overrides for ananke theme
+[readMore]
+other = "Read More"
+
+[articles]
+other = "Articles"
+
+[latestArticles]
+other = "Latest Articles"

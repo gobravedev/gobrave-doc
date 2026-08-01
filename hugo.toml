@@ -1,4 +1,57 @@
-baseURL = 'https://example.org/'
-locale = 'en-us'
-title = 'My New Hugo Project'
+# Hugo configuration for gobrave documentation site
+baseURL = 'https://gobrave.dev/'
 theme = 'ananke'
+
+# Default language
+defaultContentLanguage = 'en'
+
+# Enable Git info (lastmod dates)
+enableGitInfo = false
+
+# Syntax highlighting
+[markup]
+  [markup.highlight]
+    style = 'github-dark'
+    lineNos = true
+
+# Main menu (shared across languages)
+[[menus.main]]
+  name = 'Docs'
+  pageRef = '/docs'
+  weight = 10
+
+[[menus.main]]
+  name = 'GitHub'
+  url = 'https://github.com/gobravedev/gobrave'
+  weight = 20
+
+# Language configuration
+[languages]
+  [languages.en]
+    label = 'EN'
+    contentDir = 'content/en'
+    title = 'gobrave - Bioinformatics Analysis Platform'
+    weight = 1
+    [languages.en.params]
+      description = 'A high-performance, DAG-based bioinformatics analysis platform built with Go'
+      author = 'gobrave'
+      # Ananke theme params
+      background_color_class = 'bg-black'
+      recent_posts_number = 3
+      ananke_socials = [
+        { name = 'github', url = 'https://github.com/gobravedev/gobrave' }
+      ]
+
+  [languages.zh]
+    label = '中文'
+    contentDir = 'content/zh'
+    title = 'gobrave - 生物信息学分析平台'
+    weight = 2
+    [languages.zh.params]
+      description = '基于 Go 语言构建的高性能 DAG 生物信息学分析平台'
+      author = 'gobrave'
+      background_color_class = 'bg-black'
+      recent_posts_number = 3
+      ananke_socials = [
+        { name = 'github', url = 'https://github.com/gobravedev/gobrave' }
+      ]

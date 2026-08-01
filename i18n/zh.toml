@@ -1,0 +1,30 @@
+# Chinese translation overrides for ananke theme
+[readMore]
+other = "阅读更多"
+
+[readMoreLinkTitle]
+other = "阅读更多关于 {{ .Title }}"
+
+[articles]
+other = "文章"
+
+[latestArticles]
+other = "最新文章"
+
+[wordCount]
+other = "本文共 {{ .WordCount }} 字"
+
+[charactersCount]
+other = "{{ .CharactersCount }} 字符"
+
+[readingTime]
+other = "阅读时长 {{ .ReadingTime }} 分钟"
+
+[postedOn]
+other = "发布于"
+
+[author]
+other = "作者"
+
+[tableOfContents]
+other = "目录"
