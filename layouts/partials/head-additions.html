@@ -1,12 +1,21 @@
 {{/*
-  head-additions.html — overrides the theme partial to add Mermaid.js support
-  and custom CSS.
+  head-additions.html — overrides the theme partial to add Mermaid.js support,
+  theme switching (dark/light), and custom CSS.
 
   Includes Mermaid from CDN and initializes it on page load.
   Detects Mermaid usage via shortcode or code-fence language.
   Also delegates to the theme's hook system for head-end injections.
 */}}
 <link rel="stylesheet" href="{{ "css/custom.css" | relURL }}">
+
+{{/* Theme CSS with Hugo asset pipeline */}}
+{{- $themeCSS := resources.Get "css/theme.css" | fingerprint -}}
+<link rel="stylesheet" href="{{ $themeCSS.RelPermalink }}" integrity="{{ $themeCSS.Data.Integrity }}">
+
+{{/* Theme JS - inlined in head to prevent flash of wrong theme */}}
+{{- $themeJS := resources.Get "js/theme.js" | js.Build | fingerprint -}}
+<script src="{{ $themeJS.RelPermalink }}" integrity="{{ $themeJS.Data.Integrity }}" defer></script>
+
 {{- partials.Include "hook.html" (dict "hook" "head-end" "context" .) -}}
 
 {{- $hasMermaid := or (.HasShortcode "mermaid") (in .RawContent "mermaid") -}}

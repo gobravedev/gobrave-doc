@@ -1,0 +1,213 @@
+/*
+ * Theme variables for gobrave documentation site
+ * Supports light and dark mode via CSS custom properties
+ */
+
+/* Default light theme */
+:root {
+  --color-bg-primary: #f4f4f4;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #e8e8e8;
+  --color-bg-header: #000000;
+  --color-bg-footer: #000000;
+  --color-bg-code: #f0f0f0;
+  --color-text-primary: #111111;
+  --color-text-secondary: #555555;
+  --color-text-muted: #777777;
+  --color-text-header: #cccccc;
+  --color-text-link: #00449e;
+  --color-text-link-hover: #357edd;
+  --color-border: #dddddd;
+  --color-accent: #00449e;
+  --color-shadow: rgba(0, 0, 0, 0.08);
+  --color-card-bg: #ffffff;
+  --color-table-stripe: #f8f8f8;
+  --color-input-bg: #ffffff;
+  --color-input-border: #cccccc;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --color-bg-primary: #1a1a2e;
+  --color-bg-secondary: #16213e;
+  --color-bg-tertiary: #0f3460;
+  --color-bg-header: #0a0a1a;
+  --color-bg-footer: #0a0a1a;
+  --color-bg-code: #1e1e3a;
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #a0a0b0;
+  --color-text-muted: #888899;
+  --color-text-header: #cccccc;
+  --color-text-link: #7aa2f7;
+  --color-text-link-hover: #9eceff;
+  --color-border: #2a2a4a;
+  --color-accent: #7aa2f7;
+  --color-shadow: rgba(0, 0, 0, 0.3);
+  --color-card-bg: #16213e;
+  --color-table-stripe: #1a1a35;
+  --color-input-bg: #16213e;
+  --color-input-border: #2a2a4a;
+}
+
+/* Apply theme variables to body */
+body {
+  background-color: var(--color-bg-primary) !important;
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Main content area */
+main {
+  background-color: var(--color-bg-primary);
+}
+
+/* Override Tachyons bg-near-white */
+.bg-near-white {
+  background-color: var(--color-bg-primary) !important;
+}
+
+/* Override Tachyons bg-white */
+.bg-white {
+  background-color: var(--color-bg-secondary) !important;
+}
+
+/* Links */
+a {
+  color: var(--color-text-link);
+  transition: color 0.2s ease;
+}
+
+a:hover,
+a:focus {
+  color: var(--color-text-link-hover);
+}
+
+/* Override Ananke link colors */
+.ananke-socials a {
+  color: var(--color-text-muted) !important;
+}
+
+.ananke-socials a:hover {
+  color: var(--color-text-link-hover) !important;
+}
+
+/* Text colors */
+.near-black { color: var(--color-text-primary) !important; }
+.dark-gray { color: var(--color-text-secondary) !important; }
+.mid-gray { color: var(--color-text-muted) !important; }
+.gray { color: var(--color-text-muted) !important; }
+.light-silver { color: var(--color-text-header) !important; }
+
+/* Code blocks */
+pre, code {
+  background-color: var(--color-bg-code);
+  color: var(--color-text-primary);
+}
+
+/* Cards and articles */
+article, .card, .br2, .ba, .b--black-10,
+[class*="bg-white"],
+.bg-washed-green,
+.bg-lightest-blue,
+.bg-washed-yellow,
+.bg-washed-red {
+  background-color: var(--color-card-bg) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Tables */
+table {
+  border-color: var(--color-border);
+}
+
+table.striped tbody tr:nth-child(odd),
+tbody tr:nth-child(odd) {
+  background-color: var(--color-table-stripe);
+}
+
+/* Forms and inputs */
+input, select, textarea {
+  background-color: var(--color-input-bg);
+  color: var(--color-text-primary);
+  border-color: var(--color-input-border);
+}
+
+/* Borders */
+.b--black-10 { border-color: var(--color-border) !important; }
+.b--black-05 { border-color: var(--color-border) !important; }
+
+/* Dividers */
+hr {
+  border-color: var(--color-border);
+}
+
+/* Shadows */
+.shadow-1, .shadow-2, .shadow-3, .shadow-4, .shadow-5 {
+  box-shadow: 0 0 4px var(--color-shadow);
+}
+
+/* Theme toggle button styles */
+.theme-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  padding: 0;
+  color: var(--color-text-primary);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--color-bg-tertiary);
+  transform: scale(1.1);
+}
+
+/* In header, use light colors */
+header .theme-toggle-btn,
+.bg-black .theme-toggle-btn,
+[style*="background-color"] .theme-toggle-btn {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+header .theme-toggle-btn:hover,
+.bg-black .theme-toggle-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Mermaid diagrams in dark mode */
+[data-theme="dark"] .mermaid svg {
+  filter: invert(0.85) hue-rotate(180deg);
+}
+
+[data-theme="dark"] .mermaid svg text {
+  fill: #e0e0e0;
+}
+
+/* Smooth transitions on major elements */
+header, footer, nav, article, .bg-black, .bg-near-white, .bg-white {
+  transition: background-color 0.3s ease;
+}
+
+/* Footer overrides - keep header/footer dark-ish */
+[data-theme="dark"] footer.bg-black,
+[data-theme="dark"] header .bg-black,
+[data-theme="dark"] .pb3-m.pb6-l.bg-black {
+  background-color: var(--color-bg-header) !important;
+}
+
+/* Content cards with white backgrounds */
+.bg-white-90 { background-color: var(--color-card-bg) !important; }
+.bg-white-80 { background-color: var(--color-card-bg) !important; }
+
+/* Nested content */
+.black-90 { color: var(--color-text-primary) !important; }
+.black-80 { color: var(--color-text-primary) !important; }
+.black-70 { color: var(--color-text-secondary) !important; }
+.black-60 { color: var(--color-text-muted) !important; }
