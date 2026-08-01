@@ -1,0 +1,35 @@
+/*
+ * Custom styles for gobrave documentation site
+ */
+
+/* Reduce excessive pb7 padding on main content */
+main.pb7 {
+  padding-bottom: 2rem;
+}
+
+/* Ensure footer fills naturally and remove extra gap */
+footer.bg-black {
+  margin-top: 0;
+}
+
+/* Make page min-height fill viewport with flex layout */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+/* Mermaid diagram spacing */
+pre.mermaid {
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+
+/* Improve code block readability */
+.code-block {
+  margin: 1rem 0;
+}

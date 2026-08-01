@@ -1,0 +1,11 @@
+{{- /*
+  Mermaid code block render hook.
+
+  Renders mermaid code blocks as <pre class="mermaid"> elements that
+  Mermaid.js will transform into SVG diagrams on page load.
+
+  This bypasses Hugo's standard syntax highlighting for mermaid blocks.
+*/ -}}
+<pre class="mermaid">
+  {{- .Inner -}}
+</pre>
