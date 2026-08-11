@@ -32,7 +32,7 @@ flowchart LR
         M[ContainerManager\nCreateByTemplate / Start / Stop / Delete / OnEvent]
         D[OutboxDispatcher\nPoll pending outbox]
         W[ContainerCreateWorker\nHandle create/start/stop/delete requests]
-        R[RunRuntimeReconciler\nPeriodic monitor recovery + node backfill]
+        R[RunRuntimeReconciler\nPeriodic monitor recovery]
     end
 
     subgraph Data[Data Layer]
@@ -54,7 +54,6 @@ flowchart LR
     M -->|FSM transition + event persistence| DB
 
     R -->|RecoverRuntimeMonitoring| RT
-    R -->|BackfillRuntimeNodeName| M
     R -->|Scan active instances| DB
 ```
 
@@ -62,7 +61,7 @@ This diagram shows three key loops:
 
 - **Request loop**: `ContainerManager` persists requests into outbox, and `OutboxDispatcher` dispatches them to `ContainerCreateWorker`.
 - **State loop**: runtime lifecycle events flow back to `ContainerManager.OnEvent`, where FSM transitions and events are persisted.
-- **Recovery loop**: `RunRuntimeReconciler` periodically restores monitoring and backfills runtime node metadata.
+- **Recovery loop**: `RunRuntimeReconciler` periodically restores monitoring, and during `RecoverRuntimeMonitoring` it backfills runtime node metadata for `running` containers whose `RuntimeNodeName` is empty.
 
 ### Create Request Sequence (Detailed View)
 

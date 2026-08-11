@@ -32,7 +32,7 @@ flowchart LR
         M[ContainerManager\nCreateByTemplate / Start / Stop / Delete / OnEvent]
         D[OutboxDispatcher\n轮询 pending outbox]
         W[ContainerCreateWorker\n处理 create/start/stop/delete 请求]
-        R[RunRuntimeReconciler\n定时恢复监控 + 回填节点]
+        R[RunRuntimeReconciler\n定时恢复监控]
     end
 
     subgraph Data[数据层]
@@ -54,7 +54,6 @@ flowchart LR
     M -->|FSM 转换 + 事件落库| DB
 
     R -->|RecoverRuntimeMonitoring| RT
-    R -->|BackfillRuntimeNodeName| M
     R -->|扫描运行中实例| DB
 ```
 
@@ -62,7 +61,7 @@ flowchart LR
 
 - **请求闭环**：`ContainerManager` 将请求落到 outbox，`OutboxDispatcher` 分发给 `ContainerCreateWorker` 执行。
 - **状态闭环**：运行时事件回流到 `ContainerManager.OnEvent`，通过 FSM 持久化容器状态与事件。
-- **恢复闭环**：`RunRuntimeReconciler` 周期性恢复监控并回填运行时节点信息。
+- **恢复闭环**：`RunRuntimeReconciler` 周期性恢复监控，并在 `RecoverRuntimeMonitoring` 中对 `RuntimeNodeName` 为空的 `running` 容器回填运行时节点信息。
 
 ### 创建请求时序（细化视图）
 
