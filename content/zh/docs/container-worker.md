@@ -233,6 +233,24 @@ stateDiagram-v2
 
 ```yaml
 container:
+  # 服务启动时刷新容器镜像状态
+  refresh_image_status_on_start: true
+
+  # 服务启动时恢复之前正在运行的 DAG
+  recover_running_dag_on_start: true
+
+  # 在 DAG 启动前清理旧的节点容器
+  cleanup_dag_node_containers_before_start: true
+
+  # 节点成功后自动删除容器
+  delete_container_on_node_success: true
+
+  # DAG 节点失败时的清理策略：none/stop/delete
+  dag_node_cleanup_on_failed: stop
+
+  # DAG 结束时的清理策略：none/stop/delete
+  dag_node_cleanup_on_dag_finished: delete
+
   # 最大并发容器创建数
   create_queue_max_concurrency: 3
 
@@ -242,6 +260,12 @@ container:
 
 | 参数 | 默认值 | 描述 |
 |-----------|---------|-------------|
+| `refresh_image_status_on_start` | `true` | 服务启动时从运行时刷新容器镜像状态 |
+| `recover_running_dag_on_start` | `true` | 服务重启后恢复之前正在运行的 DAG |
+| `cleanup_dag_node_containers_before_start` | `true` | 在新 DAG 启动前清理旧的节点容器 |
+| `delete_container_on_node_success` | `true` | 节点成功完成后自动删除容器 |
+| `dag_node_cleanup_on_failed` | `stop` | DAG 节点失败时的清理策略（`none`、`stop`、`delete`） |
+| `dag_node_cleanup_on_dag_finished` | `delete` | DAG 结束时的清理策略（`none`、`stop`、`delete`） |
 | `create_queue_max_concurrency` | `3` | 最大同时创建容器数 |
 | `create_queue_max_pending` | `50` | 最大排队创建请求数，超出后拒绝 |
 

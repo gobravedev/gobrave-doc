@@ -1,114 +1,179 @@
 +++
-title = 'Container Monitoring'
-date = '2026-08-10T00:00:00+08:00'
+title = 'Container Queue Monitoring'
+date = '2026-08-11T00:00:00+08:00'
 draft = false
 type = 'page'
 layout = 'single'
 weight = 25
 +++
 
-## Container Monitoring
+## Overview
 
-The container monitoring system provides real-time visibility into the runtime state of Docker containers and Kubernetes workloads managed by gobrave.
+This document explains how gobrave exposes container create-queue health, how to interpret each metric, and how the queue status is computed internally.
 
-### Overview
+The monitoring endpoint is designed for operators and UI polling clients that need to answer:
 
-gobrave automatically monitors container lifecycle events — creation, start, exit, and failure — and exposes monitoring status through both the web UI and REST API. A global monitoring registry tracks which containers are currently under active observation.
+- Is queue mode enabled?
+- How many create slots are currently occupied?
+- How many create requests are waiting?
+- What are the configured hard limits?
 
-**Supported runtimes:**
-
-- **Docker**: monitors `docker run` containers from start to exit
-- **Kubernetes**: monitors Deployments (pod readiness) and Jobs (completion/failure)
-
-### How It Works
+## Architecture
 
 ```mermaid
-sequenceDiagram
-    participant UI
-    participant API
-    participant Manager
-    participant Runtime
-    participant K8s/Docker
+flowchart LR
+    subgraph Client[Client Layer]
+        UI[Web UI / Ops Script];
+    end;
 
-    UI->>API: Start Container
-    API->>Manager: Start(runtimeID)
-    Manager->>Runtime: Start() + Monitor()
-    Runtime->>K8s/Docker: Create workload
-    Runtime->>Runtime: Mark runtimeID (refcount++)
-    loop Poll
-        Runtime->>K8s/Docker: Check status
-    end
-    K8s/Docker-->>Runtime: Ready / Exited / Failed
-    Runtime->>Manager: Emit event (ContainerStarted/Exited/Failed)
-    Runtime->>Runtime: Unmark runtimeID (refcount--)
-    Manager->>API: Update instance status
+    subgraph API[API Layer]
+        H[ContainerHandler.GetQueueStatus];
+    end;
+
+    subgraph Worker[Queue Layer]
+        W[ContainerCreateWorker];
+        QS[QueueStatus];
+    end;
+
+    subgraph Data[Data Layer]
+        DB[(ContainerInstance + OutboxEvent)];
+    end;
+
+    UI -->|GET /container/queue/status| H;
+    H -->|QueueStatus call| W;
+    W --> QS;
+    QS -->|CountContainerInstanceByStatuses| DB;
+    QS -->|CountPendingOutboxEventsByType ContainerCreateRequest| DB;
+    H -->|JSON response| UI;
 ```
 
-When a container starts, the runtime:
+### What is measured
 
-1. Registers the `runtimeID` in the global monitoring registry with a **reference count** (refcount).
-2. Spawns a background goroutine to poll the underlying platform (Docker API / Kubernetes API).
-3. Emits lifecycle events (`ContainerStarted`, `ContainerExited`, `ContainerFailed`, `ContainerDeleted`) as state changes are detected.
-4. Decrements the refcount when monitoring completes.
+- active_count: number of container instances occupying create queue capacity
+- pending_count: number of pending create-request outbox events
+- max_concurrency: configured concurrent create limit
+- max_pending: configured queue depth limit for create requests
+- queue_enabled: whether queue-mode worker wiring is available
 
-The refcount mechanism allows multiple concurrent observers for the same runtime. For example, a Kubernetes Job gets one reference from the startup readiness watcher and another from the exit monitor — both are safely tracked and cleaned up independently.
+## API Contract
 
-### API Endpoints
+### Endpoint
 
-#### GET `/container/runtime/monitoring/list`
+- Method: GET
+- Path: /container/queue/status
+- Auth: Bearer token required
 
-Returns a snapshot of all currently monitored runtimes.
+### Response Fields
 
-**Response:**
+| Field | Type | Meaning |
+|------|------|---------|
+| active_count | integer | Current occupied create capacity |
+| pending_count | integer | Current pending create requests |
+| max_concurrency | integer | Max concurrent create operations |
+| max_pending | integer | Max allowed pending create requests |
+| queue_enabled | boolean | Queue monitoring availability flag |
+
+### Response modes
+
+The handler returns HTTP 200 in all normal control paths and uses payload values to signal mode:
+
+1. Queue disabled or worker not initialized
 
 ```json
 {
-  "data": [
-    {"runtime_id": "k8s-default|job|my-job", "ref_count": 1},
-    {"runtime_id": "docker-abc123",          "ref_count": 1}
-  ],
-  "total": 2
+	"active_count": 0,
+	"pending_count": 0,
+	"max_concurrency": 0,
+	"max_pending": 0,
+	"queue_enabled": false
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `runtime_id` | Unique identifier for the runtime |
-| `ref_count` | Number of active monitoring goroutines |
+2. Queue enabled but status read failed
 
-#### POST `/container/instance/list-by-page`
+```json
+{
+	"active_count": -1,
+	"pending_count": -1,
+	"max_concurrency": 3,
+	"max_pending": 50,
+	"queue_enabled": true
+}
+```
 
-Each container instance item now includes monitoring metadata:
+3. Queue enabled and status read succeeded
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `in_monitoring_registry` | `boolean` | Whether the container is currently being monitored |
-| `ref_count` | `number` | Active monitoring reference count |
+```json
+{
+	"active_count": 2,
+	"pending_count": 7,
+	"max_concurrency": 3,
+	"max_pending": 50,
+	"queue_enabled": true
+}
+```
 
-### Web UI
+## How QueueStatus Is Computed
 
-The **Container Instance List** page displays two additional columns:
+`QueueStatus` reads both counters inside one repository transaction:
 
-- **Monitoring**: `Yes` / `No` — indicates if the container is under active monitoring
-- **RefCount**: shows the current monitoring reference count (or `-` if zero)
+- active_count: count container instances in concurrency-occupied states
+- pending_count: count outbox events of type ContainerCreateRequest with pending status
 
-Use the monitoring API to build custom dashboards and alerting pipelines.
+Concurrency-occupied states are:
 
-### System Recovery
+- creating
+- running
+- starting
+- stopping
 
-After a system restart, the `RunRuntimeReconciler` background process:
+This means the active metric is capacity-centric, not only create-in-progress.
 
-1. Queries all non-terminal container instances from the database.
-2. Cross-references them against the active monitoring registry.
-3. Re-attaches monitors for any orphaned containers that should still be tracked.
+## Configuration Mapping
 
-This ensures that monitoring resumes automatically without manual intervention.
+These settings control the values surfaced by monitoring:
 
-### Architecture
+```yaml
+container:
+	create_queue_enabled: false
+	create_queue_max_concurrency: 3
+	create_queue_max_pending: 50
+```
 
-The monitoring registry is designed for extensibility:
+| Config Key | Effect on Monitoring |
+|------------|----------------------|
+| create_queue_enabled | If disabled, queue worker may not be wired and queue_enabled becomes false |
+| create_queue_max_concurrency | Reported as max_concurrency |
+| create_queue_max_pending | Reported as max_pending |
 
-- **Interface-based**: `MonitoringRegistry` defines `Mark`, `Unmark`, `IsMonitoring`, `MarkIfNotMonitoring`, and `Snapshot`.
-- **In-memory default**: suitable for single-node deployments.
-- **Redis-ready**: the interface can be backed by Redis for distributed deployments via dependency injection (`BuildContainer`).
-- **Thread-safe**: all operations are atomic under read/write mutexes.
+## Operational Interpretation
+
+- Healthy and idle: active_count near 0 and pending_count near 0
+- Busy but stable: active_count close to max_concurrency while pending_count fluctuates but drains
+- Saturated: active_count equals max_concurrency and pending_count grows continuously
+- Telemetry degraded: active_count and pending_count both -1
+
+## Recommended Alert Rules
+
+Suggested baseline rules for production:
+
+- Queue saturation: active_count == max_concurrency for 5 minutes
+- Queue backlog risk: pending_count >= 0.8 * max_pending for 3 minutes
+- Queue full condition: pending_count >= max_pending at any check
+- Monitoring read failure: active_count == -1 OR pending_count == -1
+
+## Polling Guidance
+
+- Default polling interval: 5 seconds for UI
+- Backoff to 15-30 seconds for low-traffic environments
+- If queue_enabled is false, stop queue polling and hide queue load indicators
+
+## Relationship to Runtime Monitoring
+
+Queue monitoring describes admission pressure before or during lifecycle transitions.
+Runtime monitoring describes runtime presence and ref-count tracking after containers are managed.
+
+Use both together:
+
+- Queue metrics explain why starts are delayed
+- Runtime monitoring explains where active workloads are currently held

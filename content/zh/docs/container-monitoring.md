@@ -1,114 +1,179 @@
 +++
-title = '容器监控'
-date = '2026-08-10T00:00:00+08:00'
+title = '容器队列监控'
+date = '2026-08-11T00:00:00+08:00'
 draft = false
 type = 'page'
 layout = 'single'
 weight = 25
 +++
 
-## 容器监控
+## 概述
 
-容器监控系统提供 gobrave 管理的 Docker 容器和 Kubernetes 工作负载的运行时状态实时可见性。
+本文档说明 gobrave 如何暴露容器创建队列健康状态、各监控字段的含义，以及队列状态在系统内部的计算方式。
 
-### 概述
+该监控接口主要服务于运维与前端轮询场景，用于回答以下问题：
 
-gobrave 自动监控容器生命周期事件——创建、启动、退出和失败——并通过 Web UI 和 REST API 暴露监控状态。全局监控注册表跟踪当前正在被观察的容器。
+- 队列模式是否启用
+- 当前有多少创建并发槽位被占用
+- 还有多少创建请求在等待
+- 当前配置的并发上限和排队上限是多少
 
-**支持的运行时：**
-
-- **Docker**：监控 `docker run` 容器从启动到退出的全过程
-- **Kubernetes**：监控 Deployment（Pod 就绪）和 Job（完成/失败）
-
-### 工作原理
+## 架构
 
 ```mermaid
-sequenceDiagram
-    participant UI
-    participant API
-    participant Manager
-    participant Runtime
-    participant K8s/Docker
+flowchart LR
+    subgraph Client[客户端层]
+        UI[Web UI / 运维脚本];
+    end;
 
-    UI->>API: 启动容器
-    API->>Manager: Start(runtimeID)
-    Manager->>Runtime: Start() + Monitor()
-    Runtime->>K8s/Docker: 创建工作负载
-    Runtime->>Runtime: 标记 runtimeID (refcount++)
-    loop 轮询
-        Runtime->>K8s/Docker: 检查状态
-    end
-    K8s/Docker-->>Runtime: 就绪 / 已退出 / 失败
-    Runtime->>Manager: 发送事件 (ContainerStarted/Exited/Failed)
-    Runtime->>Runtime: 取消标记 runtimeID (refcount--)
-    Manager->>API: 更新实例状态
+    subgraph API[接口层]
+        H[ContainerHandler.GetQueueStatus];
+    end;
+
+    subgraph Worker[队列层]
+        W[ContainerCreateWorker];
+        QS[QueueStatus];
+    end;
+
+    subgraph Data[数据层]
+        DB[(ContainerInstance + OutboxEvent)];
+    end;
+
+    UI -->|GET /container/queue/status| H;
+    H -->|QueueStatus call| W;
+    W --> QS;
+    QS -->|CountContainerInstanceByStatuses| DB;
+    QS -->|CountPendingOutboxEventsByType ContainerCreateRequest| DB;
+    H -->|JSON response| UI;
 ```
 
-容器启动时，运行时：
+### 监控指标覆盖范围
 
-1. 在全局监控注册表中以**引用计数**（refcount）注册 `runtimeID`。
-2. 启动后台 goroutine 轮询底层平台（Docker API / Kubernetes API）。
-3. 检测到状态变化时发出生命周期事件（`ContainerStarted`、`ContainerExited`、`ContainerFailed`、`ContainerDeleted`）。
-4. 监控完成时递减 refcount。
+- active_count：当前占用创建队列容量的容器实例数量
+- pending_count：当前待处理的创建请求数量（create 类型 outbox pending）
+- max_concurrency：创建并发上限配置
+- max_pending：创建排队上限配置
+- queue_enabled：队列模式是否可用（是否有可用 worker）
 
-引用计数机制允许多个并发观察者监控同一运行时。例如，Kubernetes Job 同时有启动就绪监控和退出监控两个引用——它们都被安全地跟踪和独立清理。
+## API 契约
 
-### API 端点
+### 接口信息
 
-#### GET `/container/runtime/monitoring/list`
+- 方法：GET
+- 路径：/container/queue/status
+- 鉴权：需要 Bearer Token
 
-返回所有当前被监控运行时的快照。
+### 响应字段
 
-**响应：**
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| active_count | integer | 当前占用的创建并发容量 |
+| pending_count | integer | 当前等待中的创建请求数 |
+| max_concurrency | integer | 最大并发创建数量 |
+| max_pending | integer | 最大可排队创建请求数量 |
+| queue_enabled | boolean | 队列监控是否可用 |
+
+### 响应模式
+
+该接口在正常控制流下统一返回 HTTP 200，并通过字段值表达当前模式：
+
+1. 队列关闭或 worker 未初始化
 
 ```json
 {
-  "data": [
-    {"runtime_id": "k8s-default|job|my-job", "ref_count": 1},
-    {"runtime_id": "docker-abc123",          "ref_count": 1}
-  ],
-  "total": 2
+	"active_count": 0,
+	"pending_count": 0,
+	"max_concurrency": 0,
+	"max_pending": 0,
+	"queue_enabled": false
 }
 ```
 
-| 字段 | 描述 |
-|------|------|
-| `runtime_id` | 运行时的唯一标识符 |
-| `ref_count` | 活跃监控 goroutine 数量 |
+2. 队列启用，但状态读取失败
 
-#### POST `/container/instance/list-by-page`
+```json
+{
+	"active_count": -1,
+	"pending_count": -1,
+	"max_concurrency": 3,
+	"max_pending": 50,
+	"queue_enabled": true
+}
+```
 
-每个容器实例项现在包含监控元数据：
+3. 队列启用，且状态读取成功
 
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| `in_monitoring_registry` | `boolean` | 容器当前是否被监控 |
-| `ref_count` | `number` | 活跃监控引用计数 |
+```json
+{
+	"active_count": 2,
+	"pending_count": 7,
+	"max_concurrency": 3,
+	"max_pending": 50,
+	"queue_enabled": true
+}
+```
 
-### Web 界面
+## QueueStatus 的计算方式
 
-**容器实例列表**页新增两列：
+`QueueStatus` 在同一个 repository 事务中读取两个计数：
 
-- **Monitoring**：`Yes` / `No` —— 指示容器是否处于活跃监控中
-- **RefCount**：显示当前监控引用计数（为零时显示 `-`）
+- active_count：统计并发占用状态下的容器实例数
+- pending_count：统计 `ContainerCreateRequest` 类型且状态为 pending 的 outbox 事件数
 
-可使用监控 API 构建自定义仪表板和告警流水线。
+并发占用状态包括：
 
-### 系统恢复
+- creating
+- running
+- starting
+- stopping
 
-系统重启后，`RunRuntimeReconciler` 后台进程会：
+因此，`active_count` 是“容量占用”语义，不仅仅表示“正在创建中”。
 
-1. 从数据库查询所有非终止状态的容器实例。
-2. 与活跃监控注册表进行交叉比对。
-3. 为仍应被跟踪的孤立容器重新附加监控。
+## 配置映射
 
-这确保了监控自动恢复，无需人工干预。
+以下配置项直接影响监控结果：
 
-### 架构设计
+```yaml
+container:
+	create_queue_enabled: false
+	create_queue_max_concurrency: 3
+	create_queue_max_pending: 50
+```
 
-监控注册表面向可扩展性设计：
+| 配置项 | 对监控的影响 |
+|--------|--------------|
+| create_queue_enabled | 关闭时 queue worker 可能未接入，queue_enabled 会是 false |
+| create_queue_max_concurrency | 对应响应中的 max_concurrency |
+| create_queue_max_pending | 对应响应中的 max_pending |
 
-- **基于接口**：`MonitoringRegistry` 定义了 `Mark`、`Unmark`、`IsMonitoring`、`MarkIfNotMonitoring` 和 `Snapshot` 方法。
-- **内存默认实现**：适用于单节点部署。
-- **Redis 就绪**：接口可通过依赖注入（`BuildContainer`）替换为 Redis 后端，支持分布式部署。
-- **线程安全**：所有操作在读/写互斥锁下原子执行。
+## 运维判读
+
+- 空闲健康：active_count 和 pending_count 长期接近 0
+- 繁忙稳定：active_count 接近 max_concurrency，pending_count 有波动但可持续回落
+- 持续饱和：active_count 长时间等于 max_concurrency，pending_count 持续增长
+- 监控退化：active_count 和 pending_count 同时为 -1
+
+## 告警建议
+
+生产环境可使用以下基线规则：
+
+- 队列饱和：active_count == max_concurrency 持续 5 分钟
+- 队列积压风险：pending_count >= 0.8 * max_pending 持续 3 分钟
+- 队列已满：pending_count >= max_pending 任意时刻触发
+- 状态读取失败：active_count == -1 或 pending_count == -1
+
+## 轮询建议
+
+- UI 默认轮询周期：5 秒
+- 低流量环境可放宽到 15-30 秒
+- 当 queue_enabled 为 false 时，应停止队列负载轮询并隐藏相关容量指示
+
+## 与运行时监控的关系
+
+队列监控描述的是请求准入与生命周期处理阶段的压力。
+运行时监控描述的是容器已经进入运行时后的存在性与引用关系。
+
+建议联合使用：
+
+- 队列指标用于解释“为什么启动延迟”
+- 运行时指标用于解释“工作负载当前落在哪个运行时节点”

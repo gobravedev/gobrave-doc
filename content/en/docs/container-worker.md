@@ -238,6 +238,24 @@ Configuration is in `config.yml` under the `container` section:
 
 ```yaml
 container:
+  # Refresh container image status when the service starts
+  refresh_image_status_on_start: true
+
+  # Recover previously running DAGs when the service starts
+  recover_running_dag_on_start: true
+
+  # Remove stale node containers before DAG startup
+  cleanup_dag_node_containers_before_start: true
+
+  # Delete the container after a node succeeds
+  delete_container_on_node_success: true
+
+  # Cleanup policy when a DAG node fails: none/stop/delete
+  dag_node_cleanup_on_failed: stop
+
+  # Cleanup policy when a DAG finishes: none/stop/delete
+  dag_node_cleanup_on_dag_finished: delete
+
   # Maximum number of concurrent container creations
   create_queue_max_concurrency: 3
 
@@ -247,6 +265,12 @@ container:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `refresh_image_status_on_start` | `true` | Refresh container image status from the runtime when the service starts |
+| `recover_running_dag_on_start` | `true` | Recover previously running DAGs after a restart |
+| `cleanup_dag_node_containers_before_start` | `true` | Remove stale DAG node containers before starting a new DAG |
+| `delete_container_on_node_success` | `true` | Delete the container automatically after a node completes successfully |
+| `dag_node_cleanup_on_failed` | `stop` | Cleanup policy when a DAG node fails (`none`, `stop`, or `delete`) |
+| `dag_node_cleanup_on_dag_finished` | `delete` | Cleanup policy when a DAG finishes (`none`, `stop`, or `delete`) |
 | `create_queue_max_concurrency` | `3` | Max simultaneous container creations |
 | `create_queue_max_pending` | `50` | Max queued creation requests before rejecting |
 
