@@ -10,17 +10,13 @@
   const LIGHT = "light";
 
   /**
-   * Get the user's preferred theme, checking localStorage first,
-   * then system preference, defaulting to light.
+   * Get the user's preferred theme.
+   * Use localStorage if available; otherwise default to light.
    */
   function getPreferredTheme() {
     const stored = localStorage.getItem(THEME_KEY);
     if (stored === DARK || stored === LIGHT) {
       return stored;
-    }
-    // Check system preference
-    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return DARK;
     }
     return LIGHT;
   }
@@ -91,13 +87,5 @@
   // Run immediately to prevent flash of wrong theme
   init();
 
-  // Listen for system theme changes
-  if (window.matchMedia) {
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function (e) {
-      // Only auto-switch if user hasn't manually set a preference
-      if (!localStorage.getItem(THEME_KEY)) {
-        setTheme(e.matches ? DARK : LIGHT);
-      }
-    });
-  }
+  // Keep default behavior stable: do not auto-follow system theme changes.
 })();

@@ -21,6 +21,7 @@ Welcome to the gobrave documentation. Here you'll find guides and references for
 - [DAG Workflows](/docs/dag) — Understanding DAG-based pipeline orchestration
 - [Container Management](/docs/containers) — Docker container lifecycle
 - [Container Monitoring](/docs/container-monitoring) — Real-time runtime monitoring and recovery
+- [Container Worker](/docs/container-worker) — Outbox-based asynchronous container worker queue
 - [Data Management](/docs/data) — Managing samples, files, and datasets
 
 ### Advanced Topics

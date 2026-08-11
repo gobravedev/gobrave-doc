@@ -6,8 +6,6 @@
   Detects Mermaid usage via shortcode or code-fence language.
   Also delegates to the theme's hook system for head-end injections.
 */}}
-<link rel="stylesheet" href="{{ "css/custom.css" | relURL }}">
-
 {{/* Theme CSS with Hugo asset pipeline */}}
 {{- $themeCSS := resources.Get "css/theme.css" | fingerprint -}}
 <link rel="stylesheet" href="{{ $themeCSS.RelPermalink }}" integrity="{{ $themeCSS.Data.Integrity }}">

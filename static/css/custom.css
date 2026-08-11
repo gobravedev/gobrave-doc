@@ -33,3 +33,16 @@ pre.mermaid {
 .code-block {
   margin: 1rem 0;
 }
+
+/* Wide document layout on desktop screens */
+@media (min-width: 60em) {
+  main[role="main"] > .flex-l.mt2.mw8.center {
+    max-width: min(98vw, 1920px);
+    width: 100%;
+  }
+
+  main[role="main"] > .flex-l.mt2.mw8.center > article.center.cf.pv5.ph3.ph4-ns.mw7 {
+    max-width: min(96vw, 1800px);
+    width: 100%;
+  }
+}
