@@ -21,7 +21,11 @@ Welcome to the gobrave documentation. Here you'll find guides and references for
 - [DAG Workflows](/docs/dag) — Understanding DAG-based pipeline orchestration
 - [Container Management](/docs/containers) — Docker container lifecycle
 - [Container Monitoring](/docs/container-monitoring) — Real-time runtime monitoring and recovery
+- [Runtime Monitor Recovery](/docs/runtime-monitor-recovery) — Restart-safe goroutine monitor recovery with reconciler and registry
 - [Container Worker](/docs/container-worker) — Outbox-based asynchronous container worker queue
+- [Event Bus Subscribers](/docs/event-bus-subscribers) — event_handlers subscribers and their responsibilities
+- [Outbox Dispatcher and Worker Concurrency](/docs/outbox-dispatcher-worker-concurrency) — maxPending/maxConcurrency architecture for create/start queueing and retries
+- [Node Completion Bootstrap](/docs/node-completion-bootstrap) — Startup wiring and reconciliation for DAG node terminal state consistency
 - [Data Management](/docs/data) — Managing samples, files, and datasets
 
 ### Advanced Topics

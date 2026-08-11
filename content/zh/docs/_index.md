@@ -21,7 +21,10 @@ layout = 'single'
 - [DAG 工作流](/zh/docs/dag) — 理解基于 DAG 的流程编排
 - [容器管理](/zh/docs/containers) — Docker 容器生命周期
 - [容器监控](/zh/docs/container-monitoring) — 实时运行时监控与自动恢复
+- [重启后运行时监控恢复](/zh/docs/runtime-monitor-recovery) — 通过对账器与注册表恢复 Monitor goroutine 并保障事件链路
 - [容器工作队列](/zh/docs/container-worker) — 基于 outbox 的异步容器工作队列
+- [Event Bus 订阅者](/zh/docs/event-bus-subscribers) — event_handlers 订阅者及其职责
+- [Node Completion Bootstrap 架构](/zh/docs/node-completion-bootstrap) — DAG 节点终态一致性的启动装配与收敛机制
 - [数据管理](/zh/docs/data) — 管理样本、文件和数据集
 
 ### 高级主题

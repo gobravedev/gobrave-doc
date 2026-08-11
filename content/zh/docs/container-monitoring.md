@@ -47,6 +47,45 @@ flowchart LR
     H -->|JSON response| UI;
 ```
 
+### 启动期接线如何保障容错与指标准确性
+
+队列监控能力依赖于依赖注入容器中的显式启动接线。
+这些接线不仅让队列状态可观测，也让状态在重启后可恢复、可校正。
+
+1. 通过 DI 注入监控注册表，并在全局激活。
+
+    - 注册 `MonitoringRegistry` provider，当前默认实现为内存版。
+    - 通过 `SetMonitoringRegistry` 注入运行时监控路径，确保全局只有一个监控真值来源。
+    - 因为是 DI 驱动，后续可替换为 Redis 等实现而无需改队列 API。
+
+2. 启动运行时对账器，形成持续修复闭环。
+
+    - `ContainerManager` 以 30 秒周期启动 `RunRuntimeReconciler`。
+    - 对账用于修复运行时状态与持久化状态的漂移（如崩溃、部分失败、控制面重启后）。
+    - 这可以避免长期脏状态，提升队列监控的准确性。
+
+3. 在正常队列处理前先启动 outbox 分发器。
+
+    - `RunOutboxDispatcher` 会持续清空持久化 outbox 事件并分发生命周期任务。
+    - 待处理创建请求会持久化在存储中，不会因进程重启丢失。
+    - 恢复阶段通过 replay 可让未完成工作重新进入处理流程。
+
+4. 将队列 worker 接入 `ContainerManager` 作为 create/stop 执行路径。
+
+    - `ContainerCreateWorker` 通过 `SetCreateWorker` 注入，并同时订阅事件处理。
+    - create/stop 操作会统一经过队列 worker，执行并发与 pending 上限控制。
+    - active/pending 计数来自持久化运行时与 outbox 记录，因此监控值具备可解释性。
+
+### 重启恢复模型
+
+服务重启后，队列相关任务通过“持久化状态 + 回放”恢复：
+
+- 待处理请求：以 outbox 事件形式持久化，启动后由 outbox 分发器回放。
+- 飞行中或漂移状态：由周期性运行时对账器修正。
+- 队列执行路径：通过 `ContainerManager` 的 worker 接线和事件总线订阅恢复。
+
+这些机制共同提供了容器队列处理的实用级容错能力，同时使队列状态指标足以支撑运维决策。
+
 ### 监控指标覆盖范围
 
 - active_count：当前占用创建队列容量的容器实例数量
