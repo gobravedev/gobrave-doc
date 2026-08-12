@@ -18,17 +18,19 @@ layout = 'single'
 
 ### 核心概念
 
-- [DAG 工作流](/zh/docs/dag) — 理解基于 DAG 的流程编排
 - [容器管理](/zh/docs/containers) — Docker 容器生命周期
 - [容器监控](/zh/docs/container-monitoring) — 实时运行时监控与自动恢复
 - [重启后运行时监控恢复](/zh/docs/runtime-monitor-recovery) — 通过对账器与注册表恢复 Monitor goroutine 并保障事件链路
+- [Kubernetes 运行时架构](/zh/docs/k8s-runtime-architecture) — Informer 驱动的 Monitor 模型、事件映射与重启恢复流程
 - [容器工作队列](/zh/docs/container-worker) — 基于 outbox 的异步容器工作队列
 - [Event Bus 订阅者](/zh/docs/event-bus-subscribers) — event_handlers 订阅者及其职责
+- [Outbox 分发与 Worker 并发](/zh/docs/outbox-dispatcher-worker-concurrency) — maxPending/maxConcurrency 的创建/启动排队与重试架构
 - [Node Completion Bootstrap 架构](/zh/docs/node-completion-bootstrap) — DAG 节点终态一致性的启动装配与收敛机制
 - [数据管理](/zh/docs/data) — 管理样本、文件和数据集
 
 ### 高级主题
 
+- [DAG 工作流](/zh/docs/dag) — 理解基于 DAG 的流程编排
 - [动态编排 V2](/zh/docs/orchestration-v2) — 运行时节点实例化
 - [数据流引擎 V3](/zh/docs/dataflow-v3) — 响应式流式管道
 - [LLM 集成](/zh/docs/llm) — AI 辅助分析设置

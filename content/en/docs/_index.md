@@ -18,7 +18,6 @@ Welcome to the gobrave documentation. Here you'll find guides and references for
 
 ### Core Concepts
 
-- [DAG Workflows](/docs/dag) — Understanding DAG-based pipeline orchestration
 - [Container Management](/docs/containers) — Docker container lifecycle
 - [Container Monitoring](/docs/container-monitoring) — Real-time runtime monitoring and recovery
 - [Runtime Monitor Recovery](/docs/runtime-monitor-recovery) — Restart-safe goroutine monitor recovery with reconciler and registry
@@ -30,7 +29,7 @@ Welcome to the gobrave documentation. Here you'll find guides and references for
 - [Data Management](/docs/data) — Managing samples, files, and datasets
 
 ### Advanced Topics
-
+- [DAG Workflows](/docs/dag) — Understanding DAG-based pipeline orchestration
 - [Dynamic Orchestration V2](/docs/orchestration-v2) — Runtime node materialization
 - [Dataflow Engine V3](/docs/dataflow-v3) — Reactive streaming pipelines
 - [LLM Integration](/docs/llm) — AI-assisted analysis setup
