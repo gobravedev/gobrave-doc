@@ -9,36 +9,52 @@ weight = 26
 
 ## Overview
 
-This document explains how gobrave restores runtime monitor goroutines after a process restart, using:
+This document explains how gobrave restores runtime lifecycle monitoring after a process restart.
 
-- `RunRuntimeReconciler` for periodic recovery
-- `MonitoringRegistry` for idempotent monitor membership
-- runtime `Monitor(...)` implementations that relaunch goroutines per runtime
+The current recovery path is based on:
 
-The goal is to keep `ContainerInstance` state aligned with the real runtime state and ensure terminal container events are delivered into the event pipeline.
+- `ContainerManager.RunRuntimeReconciler(...)`
+- `ContainerManager.RecoverRuntimeMonitoring(...)`
+- runtime `Monitor(ctx, runtimeID)` implementations
+- process-global `MonitoringRegistry` idempotency guard
+
+The goal is to reattach monitoring for recoverable container instances and continue emitting runtime events into the normal state transition pipeline.
 
 ## Why Recovery Is Needed
 
-After a service restart, in-memory goroutines are lost, including runtime exit watchers.
-Without recovery, a container could finish in the runtime while its persisted `ContainerInstance` remains `running` or `creating`.
+After service restart, in-memory monitor goroutines are lost.
+Without recovery, runtime state can change while persisted `ContainerInstance` status stays stale.
 
 ## Startup And Periodic Recovery
 
-At startup, dependency wiring invokes:
+Startup wiring invokes:
 
-- `ContainerManager.RunRuntimeReconciler(context.Background(), 30*time.Second)`
+- `ContainerManager.RunRuntimeReconciler(context.Background(), 600*time.Second)`
 
 `RunRuntimeReconciler` performs:
 
 1. Immediate recovery once at startup
-2. Periodic recovery every interval (default 30s)
+2. Periodic recovery every configured interval
+
+If `interval <= 0`, the reconciler falls back to `300s`.
 
 Each recovery cycle calls `RecoverRuntimeMonitoring`, which:
 
 - Reads persisted `ContainerInstance` records
-- Filters records eligible for monitoring recovery (`creating`, `paused`, `running`, and non-empty runtime ID)
-- Resolves the corresponding runtime implementation
-- Calls runtime `Monitor(ctx, runtimeID)` when the runtime supports `RuntimeMonitor`
+- Filters records eligible for monitoring recovery
+- Resolves runtime implementation from instance runtime information
+- Optionally backfills runtime inspect data for running instances
+- Calls runtime `Monitor(ctx, runtimeID)` when runtime supports `RuntimeMonitor`
+- Logs per-instance recover success or failure and continues scanning
+
+Eligible statuses are:
+
+- `creating`
+- `paused`
+- `running`
+- `failed`
+
+Instances with empty runtime ID are skipped.
 
 ## Role Of MonitoringRegistry
 
@@ -46,10 +62,10 @@ Each recovery cycle calls `RecoverRuntimeMonitoring`, which:
 
 - `MarkIfNotMonitoring(runtimeID)` atomically marks membership only if absent
 - Repeated recoveries for the same runtime ID are safe and idempotent
-- `Unmark(runtimeID)` is called when watcher goroutines exit
-- `Snapshot()` can expose current monitor reference counts for diagnostics
+- `UnmarkRuntimeMonitoring(runtimeID)` is called when watcher exits or subscription completes
+- `RuntimeMonitoringSnapshot()` exposes runtime ID to count mapping for diagnostics
 
-This means the reconciler can run repeatedly without spawning unbounded duplicate goroutines.
+This lets reconciler run repeatedly without creating duplicate active monitors.
 
 ## Runtime Monitor Behavior
 
@@ -62,64 +78,90 @@ Typical watcher behavior:
 - Emit runtime event (`ContainerExited`, `ContainerFailed`, `ContainerDeleted`, etc.)
 - Unmark monitoring membership on goroutine exit
 
-## State Consistency: ContainerInstance vs Real Runtime
+## Runtime Inspect Backfill During Recovery
 
-When runtime events arrive at `ContainerManager.OnEvent(...)`, manager transitions persisted `ContainerInstance` state:
+Before calling `Monitor`, recovery performs best-effort inspect sync only when all conditions are true:
+
+- instance status is `running`
+- runtime ID is not empty
+- `RuntimeNodeName` is empty
+
+If runtime supports `RuntimeInspector`, manager calls `Inspect` and persists changed `IPAddress` or `RuntimeNodeName`.
+
+## State Consistency And Event Pipeline
+
+Recovery itself does not emit synthetic reconciliation events.
+State changes continue to flow through runtime monitor events handled by `ContainerManager.OnEvent`.
+
+Typical transitions are:
 
 - `ContainerStarted` -> `running`
 - `ContainerExited` -> `stopped`
 - `ContainerFailed` -> `failed`
 - `ContainerDeleted` -> `stopped`
 
-Transition logic updates:
-
-- instance status
-- started/finished timestamps when relevant
-- container event records
-
-This keeps persisted state consistent with actual runtime completion signals.
+Transition handling persists container instance updates and writes outbox events for downstream subscribers.
 
 ## Event Delivery To Bus
 
-For transition events, manager writes an outbox record (`pending`) with serialized `ContainerEvent` payload.
+For transition events, manager writes outbox records with serialized container event payloads.
 Then the outbox dispatcher publishes those events to the bus, so downstream handlers can react even after restarts.
 
-Because both reconciler and outbox dispatcher run at startup, terminal events observed after monitor recovery are still propagated through the normal event pipeline.
+Because reconciler and dispatcher run at startup, post-recovery runtime events are delivered through the same durable pipeline.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A[Process Restart] --> B[BuildContainer Startup Wiring]
-
+    A[Process Restart] --> B[Startup Wiring]
     B --> C[RunRuntimeReconciler]
-    C --> D[RecoverRuntimeMonitoring]
-    D --> E[ContainerInstance Table]
-    D --> F[Resolve Runtime by RuntimeID]
-    F --> G[Runtime Monitor runtimeID]
 
-    G --> H{MonitoringRegistry\nMarkIfNotMonitoring}
-    H -->|already monitored| I[No duplicate goroutine]
-    H -->|new monitoring| J[Start watcher goroutine]
+    C --> D[Immediate Recover Cycle]
+    C --> E[Ticker Recover Cycle]
 
-    J --> K[Wait real runtime terminal state]
-    K --> L[Emit RuntimeEvent\nExited/Failed/Deleted]
+    D --> F[List ContainerInstance]
+    E --> F
 
-    L --> M[ContainerManager.OnEvent]
-    M --> N[Update ContainerInstance Status]
-    M --> O[Create ContainerEvent]
-    M --> P[Create OutboxEvent pending]
+    F --> G[Filter Recoverable Status]
+    G --> H[Resolve Runtime]
+    H --> I[Optional Inspect Backfill]
+    I --> J[Call Runtime Monitor]
 
-    B --> Q[RunOutboxDispatcher]
-    Q --> R[Publish event to Bus]
-    P --> Q
+    J --> K[MarkIfNotMonitoring]
+    K -->|already active| L[Skip Duplicate]
+    K -->|new active| M[Start Watcher]
 
-    R --> S[Event Handlers\nApp session, route, worker, etc.]
+    M --> N[Emit Runtime Event]
+    N --> O[ContainerManager OnEvent]
+    O --> P[Persist Instance Transition]
+    P --> Q[Create Outbox Event]
+    Q --> R[Outbox Dispatcher]
+    R --> S[Event Bus Subscribers]
 ```
 
 ## Operational Notes
 
-- Recovery is eventually consistent, not instantaneous; bounded by reconciler interval.
-- Duplicate monitor creation is prevented by registry atomic check.
-- Terminal state propagation remains durable because transition events are persisted before bus dispatch.
-- If a runtime does not implement `RuntimeMonitor`, that runtime is skipped by recovery logic.
+1. Recovery is eventually consistent and bounded by reconciler interval.
+2. Startup cycle always runs once immediately after reconciler starts.
+3. Periodic cycle logs success only when `recovered > 0`.
+4. If one instance fails to recover, scan continues for remaining instances.
+5. If runtime does not implement `RuntimeMonitor`, instance is skipped.
+6. Monitoring dedup is guaranteed by `MarkIfNotMonitoring`.
+
+## Troubleshooting Checklist
+
+1. Startup recovery did not run:
+- Check startup logs for `startup runtime monitor recovery` entries.
+- Verify `RunRuntimeReconciler` wiring in container bootstrap.
+
+2. Instance is skipped unexpectedly:
+- Check status is one of `creating`, `paused`, `running`, `failed`.
+- Check runtime ID is not empty.
+- Check runtime can be resolved by instance runtime metadata.
+
+3. No periodic recovery logs:
+- Periodic success logs appear only when recovered count is greater than zero.
+- Check warning logs for periodic failures.
+
+4. Duplicate monitor concern:
+- Use runtime monitoring snapshot endpoint to verify current monitored runtime IDs and counts.
