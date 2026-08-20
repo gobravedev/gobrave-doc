@@ -22,6 +22,7 @@ Welcome to the gobrave documentation. Here you'll find guides and references for
 - [Container Monitoring](/docs/container-monitoring) — Real-time runtime monitoring and recovery
 - [Runtime Monitor Recovery](/docs/runtime-monitor-recovery) — Restart-safe goroutine monitor recovery with reconciler and registry
 - [Kubernetes Runtime Architecture](/docs/k8s-runtime-architecture) — Informer-driven Monitor model, event mapping, and restart-safe recovery workflow
+- [Container User Selection](/docs/container-user-selection) — When gobrave sets runtime user values for Docker and Kubernetes
 - [Container Worker](/docs/container-worker) — Outbox-based asynchronous container worker queue
 - [Event Bus Subscribers](/docs/event-bus-subscribers) — event_handlers subscribers and their responsibilities
 - [Outbox Dispatcher and Worker Concurrency](/docs/outbox-dispatcher-worker-concurrency) — maxPending/maxConcurrency architecture for create/start queueing and retries
